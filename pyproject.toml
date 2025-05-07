@@ -1,7 +1,7 @@
 [project]
 name = "pysample"
 version = "0.1.0"
-description = "Add your description here"
+description = "生成软件著作权文档的 python 工具"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,6 +9,14 @@ dependencies = [
     "loguru>=0.7.3",
     "python-docx>=1.1.2",
 ]
+authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
+license = "MIT"
+
+[project.scripts]
+pysample = "main:main"
+
+[project.urls]
+Homepage = "https://github.com/EaphoneTech/pysample"
 
 [tool.ruff.lint]
 ignore = ["F821", "E501"]

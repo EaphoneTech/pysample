@@ -1,6 +1,6 @@
 # pysample
 
-生成软件著作权的 python 工具
+生成软件著作权文档的 python 工具
 
 ## 配置文件
 
@@ -26,6 +26,14 @@
 }
 ```
 
+简单来说, 需要在 `patterns` 中指定要包括的文件, 在 `extensions` 中指定要包括的文件的后缀名, 并填写 `title`, `version` 和 `company` 这些信息。
+
 ## 输出
 
 对于配置文件中的每一个 group, 会在 `.bring-it/sample/` 目录下生成 `{title}_{version}.docx`
+
+## 用法
+
+```bash
+uvx --from git+https://github.com/EaphoneTech/pysample.git pysample
+```

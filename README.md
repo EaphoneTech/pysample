@@ -19,7 +19,8 @@
       "title": "示例软件名称",
       "version": "v1.0",
       "company": "Cyberdyne Systems Corporation",
-      "lineNumber": true
+      "lineNumber": true,
+      "maxLines": 2000
     }
   ]
 }

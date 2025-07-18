@@ -233,6 +233,10 @@ def add_main_content(
     total_lines = 0  # 初始化总行数计数器
 
     for i, file_path in enumerate(files):
+        if total_lines > max_lines:
+            logger.info("已达到行数限制 {}", max_lines)
+            break
+
         full_path = Path(file_path)
         try:
             with open(full_path, encoding="utf-8") as file:
@@ -243,18 +247,9 @@ def add_main_content(
                 if include_line_numbers:
                     numbered_lines = [
                         f"{i + 1}: {line}"
-                        for i, line in enumerate(lines, start=total_lines + 1)
+                        for i, line in enumerate(lines, start=total_lines)
                     ]
                     content = "\n".join(numbered_lines)
-
-                # 如果当前不是最后一个文件且总行数加上当前文件行数超过 max_lines, 则跳过后续文件
-                if (
-                    i < len(files) - 1
-                    and max_lines is not None
-                    and total_lines + len(lines) > max_lines
-                ):
-                    logger.info("已达到行数限制 {}", max_lines)
-                    break
 
                 doc.add_paragraph(content)
                 total_lines += len(lines)  # 更新总行数计数器
@@ -271,6 +266,7 @@ def add_content_to_docx(
     company: str,
     files: list[Path],
     include_line_numbers: bool,
+    max_lines: int,
 ) -> None:
     # 设置全局字体
     set_font(doc)
@@ -282,7 +278,7 @@ def add_content_to_docx(
     add_title_page(doc, title, version, company)
 
     # 添加正文内容
-    add_main_content(doc, files, include_line_numbers)
+    add_main_content(doc, files, include_line_numbers, max_lines=max_lines)
 
 
 @click.command()
@@ -307,6 +303,7 @@ def main(verbose: bool) -> None:
         version = group.get("version", "1.0")
         company = group.get("company", "未知公司")
         include_line_numbers = group.get("lineNumber", False)
+        max_lines = group.get("maxLines", 2000)
 
         matched_files = scan_files(base_dir, patterns, extensions, ignore_dirs, verbose)
         output_file = Path(f"./.bring-it/sample/{title}_{version}.docx")
@@ -315,7 +312,13 @@ def main(verbose: bool) -> None:
 
         doc = Document()
         add_content_to_docx(
-            doc, title, version, company, matched_files, include_line_numbers
+            doc,
+            title,
+            version,
+            company,
+            matched_files,
+            include_line_numbers,
+            max_lines=max_lines,
         )
         doc.save(output_file)
         logger.info("DOCX 文件已生成: {}", output_file)

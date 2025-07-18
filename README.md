@@ -4,10 +4,9 @@
 
 ## 配置文件
 
-该文件读取 [@bring-it/sample](https://github.com/Airkro/bring-it/tree/master/packages/sample) 的配置文件，例如:
+该文件读取 [@bring-it/sample](https://github.com/Airkro/bring-it/tree/master/packages/sample) 的配置文件: `.bring-it/sample.config.json`，例如:
 
-```jsonc
-// .bring-it/sample.config.json
+```jsonc title=".bring-it/sample.config.json"
 {
   "group": [
     {
@@ -36,4 +35,8 @@
 
 ```bash
 uvx --from git+https://github.com/EaphoneTech/pysample.git pysample
+```
+
+```bash
+uvx --default-index http://mirrors.aliyun.com/pypi/simple/ --from git+https://github.com/EaphoneTech/pysample.git pysample
 ```

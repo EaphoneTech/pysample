@@ -311,6 +311,8 @@ def main(verbose: bool) -> None:
         matched_files = scan_files(base_dir, patterns, extensions, ignore_dirs, verbose)
         output_file = Path(f"./.bring-it/sample/{title}_{version}.docx")
 
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
         doc = Document()
         add_content_to_docx(
             doc, title, version, company, matched_files, include_line_numbers

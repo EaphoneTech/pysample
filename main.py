@@ -1,8 +1,10 @@
+import itertools
 import json
 from pathlib import Path
 from typing import Any
 
 import click
+import pathspec
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
@@ -28,23 +30,55 @@ def scan_files(
     extensions: list[str],
     ignore_dirs: list[str],
     verbose: bool,
+    title: str | None = None,
 ) -> list[Path]:
     base_path = Path(base_dir)
     if not base_path.exists() or not base_path.is_dir():
-        logger.error("基础路径 {} 不存在或不是一个目录", base_path)
+        logger.error("{}: 基础路径 {} 不存在或不是一个目录", title, base_path)
         raise ValueError(f"基础路径 {base_path} 不存在或不是一个目录")
+
+    if patterns is None or len(patterns) == 0:
+        logger.error("{}: 未指定扫描模式 'patterns'", title)
+        raise ValueError("未指定扫描模式")
+
+    if extensions is None or len(extensions) == 0:
+        logger.error("{}: 未指定文件后缀 'extensions'", title)
+        raise ValueError("未指定文件后缀")
+
+    # 创建一个包含手动指定 ignore_dirs 的 pathspec 规则列表
+    ignore_patterns = ignore_dirs[:]  # 复制 ignore_dirs 列表
+
+    # 尝试读取 .gitignore 文件并添加到忽略规则中
+    gitignore_path = base_path / ".gitignore"
+    if gitignore_path.exists():
+        with open(gitignore_path, encoding="utf-8") as f:
+            gitignore_content = f.read()
+        # 过滤掉空行和注释行
+        gitignore_patterns = [
+            line.strip()
+            for line in gitignore_content.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        ignore_patterns.extend(gitignore_patterns)
+
+    # 使用 pathspec 创建忽略规则
+    ignore_spec = pathspec.PathSpec.from_lines("gitwildmatch", ignore_patterns)
 
     matched_files: list[Path] = []
 
-    for pattern in patterns:
-        for ext in extensions:
-            if verbose:
-                logger.debug("正在扫描路径: {}/{}.{}", base_path, pattern, ext)
-            for file_path in base_path.glob(f"{pattern}.{ext}"):
-                if file_path.is_file() and all(
-                    ignore_dir not in file_path.parts for ignore_dir in ignore_dirs
-                ):
-                    relative_path = file_path.relative_to(base_path)
+    for pattern, ext in itertools.product(patterns, extensions):
+        if not pattern.endswith("/"):
+            pattern += "/"
+        glob_pattern = f"{pattern}**/*.{ext}" if pattern else f"**/*.{ext}"
+        if verbose:
+            logger.debug("正在扫描路径: {} with pattern: {}", base_path, glob_pattern)
+        for file_path in base_path.glob(glob_pattern):
+            if file_path.is_file():
+                # 计算相对于 base_path 的路径用于匹配忽略规则
+                relative_path = file_path.relative_to(base_path)
+
+                # 检查是否匹配忽略规则
+                if not ignore_spec.match_file(str(relative_path)):
                     matched_files.append(relative_path)
                     logger.debug("匹配的文件: {}", relative_path)
 
@@ -294,7 +328,10 @@ def main(verbose: bool) -> None:
 
     config = read_config(config_path)
 
-    for group in config.get("group", []):
+    for i, group in enumerate(config.get("group", [])):
+        if verbose:
+            logger.debug("处理第 {} 个组 {}", i + 1, group.get("title", "(未命名)"))
+
         base_dir = group.get("cwd", "")
         patterns = group.get("patterns", [])
         extensions = group.get("extensions", [])
@@ -305,7 +342,14 @@ def main(verbose: bool) -> None:
         include_line_numbers = group.get("lineNumber", False)
         max_lines = group.get("maxLines", 2000)
 
-        matched_files = scan_files(base_dir, patterns, extensions, ignore_dirs, verbose)
+        matched_files = scan_files(
+            base_dir,
+            patterns,
+            extensions,
+            ignore_dirs,
+            title=title,
+            verbose=verbose,
+        )
         logger.info("文件扫描完成")
 
         output_file = Path(f"./.bring-it/sample/{title}_{version}.docx")

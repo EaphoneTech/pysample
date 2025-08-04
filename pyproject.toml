@@ -1,13 +1,14 @@
 [project]
 name = "pysample"
-version = "0.1.0"
+version = "0.1.1"
 description = "生成软件著作权文档的 python 工具"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.1.8",
-    "loguru>=0.7.3",
-    "python-docx>=1.1.2",
+    "click>=8.1",
+    "pathspec>=0.12",
+    "loguru>=0.7",
+    "python-docx>=1.1",
 ]
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
 license = "MIT"
@@ -17,6 +18,11 @@ pysample = "main:main"
 
 [project.urls]
 Homepage = "https://github.com/EaphoneTech/pysample"
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
 
 [tool.ruff.lint]
 ignore = ["F821", "E501"]

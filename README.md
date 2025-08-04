@@ -66,6 +66,8 @@ Installed 1 executable: pysample.exe
 
 安装后就可以直接用 `pysample` 来运行了。
 
+安装后，使用 `uv tool upgrade pysample` 可以升级。
+
 ### 使用 docker
 
 TODO: 目前还未完成

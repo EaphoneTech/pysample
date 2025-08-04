@@ -11,14 +11,14 @@ from docx.shared import Cm, Pt
 from loguru import logger
 
 
-def read_config(config_path: str) -> dict[str, Any]:
+def read_config(config_path: Path) -> dict[str, Any]:
     try:
         with open(config_path, encoding="utf-8") as file:
             config = json.load(file)
-        logger.info("配置文件已从 {} 加载", config_path)
+        logger.info("已从 {} 加载了配置文件", config_path)
         return config
-    except Exception as e:
-        logger.error("无法从 {} 加载配置文件: {}", config_path, e)
+    except Exception:
+        logger.error("无法从 {} 加载配置文件", config_path.resolve())
         raise
 
 
@@ -284,7 +284,7 @@ def add_content_to_docx(
 @click.command()
 @click.option("--verbose", is_flag=True, default=False, help="启用详细日志输出")
 def main(verbose: bool) -> None:
-    config_path = ".bring-it/sample.config.json"
+    config_path = Path(".bring-it/sample.config.json")
 
     if verbose:
         logger.level("DEBUG")
@@ -306,6 +306,8 @@ def main(verbose: bool) -> None:
         max_lines = group.get("maxLines", 2000)
 
         matched_files = scan_files(base_dir, patterns, extensions, ignore_dirs, verbose)
+        logger.info("文件扫描完成")
+
         output_file = Path(f"./.bring-it/sample/{title}_{version}.docx")
 
         output_file.parent.mkdir(parents=True, exist_ok=True)

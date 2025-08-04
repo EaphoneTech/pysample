@@ -34,10 +34,42 @@
 
 ## 用法
 
-```bash
-uvx --from git+https://github.com/EaphoneTech/pysample.git pysample
-```
+### 使用 uv 直接运行
+
+不需要将本仓库 clone 到本地, uv 会处理。
 
 ```bash
-uvx --default-index http://mirrors.aliyun.com/pypi/simple/ --from git+https://github.com/EaphoneTech/pysample.git pysample
+$ uvx --from git+https://github.com/EaphoneTech/pysample.git pysample
+```
+
+### 使用 uv tool 安装
+
+使用下面的方式, 可以将 pysample 作为一个应用程序安装到本机:
+
+```bash
+$ uvx install --from git+https://github.com/EaphoneTech/pysample.git pysample
+Resolved 8 packages in 1.90s
+    Updated https://github.com/EaphoneTech/pysample.git (5b31b6503d1a904c1ad27e0b241821ed67af8f75)
+      Built pysample @ git+https://github.com/EaphoneTech/pysample.git@5b31b6503d1a904c1ad27e0b241821ed67af8f75
+Prepared 1 package in 6.58s
+Installed 8 packages in 95ms
+ + click==8.2.1
+ + colorama==0.4.6
+ + loguru==0.7.3
+ + lxml==6.0.0
+ + pysample==0.1.0 (from git+https://github.com/EaphoneTech/pysample.git@5b31b6503d1a904c1ad27e0b241821ed67af8f75)
+ + python-docx==1.2.0
+ + typing-extensions==4.14.1
+ + win32-setctime==1.2.0
+Installed 1 executable: pysample.exe
+```
+
+安装后就可以直接用 `pysample` 来运行了。
+
+### 使用 docker
+
+TODO: 目前还未完成
+
+```bash
+docker run --rm xxx
 ```

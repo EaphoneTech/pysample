@@ -1,5 +1,5 @@
 # 使用官方Python运行时作为基础镜像
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 

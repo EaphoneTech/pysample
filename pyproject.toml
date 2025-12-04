@@ -5,10 +5,10 @@ description = "生成软件著作权文档的 python 工具"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.1",
+    "click>=8.3",
     "pathspec>=0.12",
     "loguru>=0.7",
-    "python-docx>=1.1",
+    "python-docx>=1.2",
 ]
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
 license = "MIT"

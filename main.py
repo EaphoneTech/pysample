@@ -45,6 +45,20 @@ def scan_files(
         logger.error("{}: 未指定文件后缀 'extensions'", title)
         raise ValueError("未指定文件后缀")
 
+    # 在这里将 patterns 拆分为 已经是文件的 , 和需要 glob 的
+    matched_files: list[Path] = []
+    glob_patterns: list[str] = []
+
+    for p in patterns:
+        if p is not None:
+            pp = Path(p)
+            if pp.exists() and pp.is_file():
+                if verbose:
+                    logger.debug("直接命中文件: {} with pattern: {}", base_path, p)
+                matched_files.append(pp)
+                continue
+        glob_patterns.append(p)
+
     # 创建一个包含手动指定 ignore_dirs 的 pathspec 规则列表
     ignore_patterns = ignore_dirs[:]  # 复制 ignore_dirs 列表
 
@@ -64,9 +78,7 @@ def scan_files(
     # 使用 pathspec 创建忽略规则
     ignore_spec = pathspec.PathSpec.from_lines("gitwildmatch", ignore_patterns)
 
-    matched_files: list[Path] = []
-
-    for pattern, ext in itertools.product(patterns, extensions):
+    for pattern, ext in itertools.product(glob_patterns, extensions):
         if not pattern.endswith("/"):
             pattern += "/"
         glob_pattern = f"{pattern}**/*.{ext}" if pattern else f"**/*.{ext}"

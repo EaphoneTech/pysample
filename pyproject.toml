@@ -1,20 +1,20 @@
 [project]
 name = "pysample"
-version = "0.1.2"
+version = "1.0.0"
 description = "生成软件著作权文档的 python 工具"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.4",
     "pathspec>=1.1",
-    "loguru>=0.7",
-    "python-docx>=1.2",
+    "typer>=0.16",
+    "copyright-code-extractor>=0.2.1",
 ]
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
 license = "MIT"
+license-files = ["licenses/*"]
 
 [project.scripts]
-pysample = "main:main"
+pysample = "main:app"
 
 [project.urls]
 Homepage = "https://github.com/EaphoneTech/pysample"
@@ -25,7 +25,7 @@ url = "https://mirrors.aliyun.com/pypi/simple/"
 default = true
 
 [tool.ruff.lint]
-ignore = ["F821", "E501"]
+ignore = ["F821", "E501", "RUF001", "RUF002", "RUF003"]
 select = [
     "E",    # pycodestyle
     "F",    # Pyflakes
@@ -33,7 +33,11 @@ select = [
     "B",    # flake8-bugbear
     "SIM",  # flake8-simplify
     "I",    # isort
-    "NPY",  # numpy specific rules
     "PERF", # "perflint"
     "RUF",  # ruff specific rules
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.21",
 ]

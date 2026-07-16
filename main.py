@@ -345,7 +345,7 @@ def main(verbose: bool) -> None:
             logger.debug("处理第 {} 个组 {}", i + 1, group.get("title", "(未命名)"))
 
         base_dir = group.get("cwd", "")
-        patterns = group.get("patterns", [])
+        patterns = group.get("patterns", ["**"])
         extensions = group.get("extensions", [])
         ignore_dirs = group.get("ignore", [])
         title = group.get("title", "未命名文档")

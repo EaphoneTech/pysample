@@ -392,7 +392,7 @@ wheels = [
 [[package]]
 name = "pysample"
 version = "1.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "copyright-code-extractor" },
     { name = "pathspec" },

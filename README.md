@@ -123,8 +123,26 @@ $ uv tool install --from "git+https://github.com/EaphoneTech/pysample@feat/use-c
 
 ### 使用 docker
 
-TODO: 目前还未完成
+镜像托管于 GitHub Container Registry，提供两个变体标签，分别对应两种后端：
+
+- `latest`（默认，纯 MIT/BSD 依赖，无 GPL 组件）
+- `external-latest`（额外聚合 GPL-3.0 的 copyright-code-extractor）
+
+镜像的 `ENTRYPOINT` 为 `pysample`，因此 `docker run` 后接的参数会原样传给 `pysample`。
+使用时把当前工作目录挂载进容器（`-v "$PWD":/work -w /work`），
+工具会读取其中的 `.bring-it/sample.config.json` 并在 `.bring-it/sample/` 下生成 DOCX。
 
 ```bash
-docker run --rm xxx
+# builtin 后端（默认，纯 MIT，无 GPL 依赖）
+$ docker pull ghcr.io/eaphonetech/pysample:latest
+$ docker run --rm -v "$PWD":/work -w /work ghcr.io/eaphonetech/pysample:latest
+
+# external 后端（GPL-3.0 聚合依赖，需显式指定 --backend external）
+$ docker pull ghcr.io/eaphonetech/pysample:external-latest
+$ docker run --rm -v "$PWD":/work -w /work ghcr.io/eaphonetech/pysample:external-latest --backend external
 ```
+
+> **注意**：`external` 镜像仅在使用 `--backend external` 时才会调用 copyright-code-extractor；
+> 即便拉取了 `external-latest` 镜像，不加该参数仍走 `builtin` 生成逻辑。
+> 两个变体同样遵循「Mere Aggregation」聚合关系，许可证说明见
+> [THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md)。

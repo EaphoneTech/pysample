@@ -67,10 +67,11 @@ jobs:
           flavor: |
             prefix=${{ matrix.variant == 'external' && 'external-' || '' }}
           tags: |
-            type=raw,value=latest
+            # latest 标签显式按变体命名，并用 prefix= 覆盖全局前缀，
+            # 避免 external 变体误推裸 latest（与 builtin 的 latest 冲突）。
+            type=raw,value=${{ matrix.variant == 'external' && 'external-latest' || 'latest' }},prefix=
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
-            type=sha
       - name: Build and push
         uses: docker/build-push-action@v7
         with:

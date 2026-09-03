@@ -6,6 +6,8 @@
 - **状态**: 已接受
 - **作者**: Xiaoyu Guo
 - **更新**: 2026-07-16 — 重构为委托架构，以后端生成委托给 copyright-code-extractor
+- **更新**: 2026-09-03 — 补充决策 9/10（init 子命令、双后端）；新增决策 11（Docker 运行模式）
+- **更新**: 2026-09-03 — 新增决策 12（双变体 Docker CI：Dockerfile 参数化 + matrix 发布 tag 体系）
 
 ## 背景
 
@@ -76,11 +78,14 @@ pysample 是一个生成软件著作权源代码文档的 CLI 工具。它读取
 
 ### 4. Typer 作为 CLI 框架
 
-**决策**: 使用 Typer 作为命令行参数解析框架，目前仅有 `--verbose` 一个选项。
+**决策**: 使用 Typer 作为命令行参数解析框架，运行时依赖为 `typer-slim`
+（PyPI 上完整 Typer 的别名，代码仍 `import typer`）。目前有 `--verbose` 选项及 `init` 子命令。
 
 **理由**:
 - copyright-code-extractor 已经依赖 `typer>=0.16.0` + `rich>=14.0.0`，
   使用 Typer 不引入新的传递依赖，反而减少了项目自己的依赖列表
+- 2026-09 将依赖从 `typer` 迁移为 `typer-slim`：仅改依赖名，行为不变；
+  typer-slim 自 Typer 0.22 起仅为完整 Typer 的别名，rich 仍由 copyright-code-extractor 间接引入，属预期
 - Typer 基于 type hints 定义 CLI 接口，比 Click 的装饰器风格更现代
 - Typer 实例可直接作为 `app` 入口点，支持 `typer.run()` 和子命令扩展
 
@@ -123,6 +128,90 @@ pysample 是一个生成软件著作权源代码文档的 CLI 工具。它读取
 - 项目处于早期阶段，功能仍在快速迭代
 - 外部依赖（文件系统、子进程调用）使测试设置成本较高
 
+### 9. init 子命令与交互式初始化
+
+**决策**: 新增 `pysample init` 子命令，以及裸 `pysample` 的无配置自动提示，交互式生成
+`.bring-it/sample.config.json`。
+
+**理由**:
+- 降低上手成本：用户无需手工编写 JSON 配置即可开始使用
+- 复用 Typer 的 `typer.prompt` / `typer.confirm` 实现交互，沿用既有 CLI 框架
+- `detect_languages()` 自动探测项目中的常见源码格式（某语言文件数 ≥2 或 总字节 ≥1kB 即视为检测到），
+  自动预填 `extensions`，减少手工配置
+- 命令分发采用 `app.callback(invoke_without_command=True)` + `ctx.invoked_subcommand` 判断：
+  裸 `pysample` 执行文档生成（无配置时提示初始化，默认 Y），`pysample init` 处理初始化
+  （已存在配置时提示重新初始化，默认 N）；两条路径共用 `run_init()`，避免逻辑重复
+
+**权衡**:
+- 初始化仅生成单 group 的简化配置（`patterns=["**/*"]`，title/version/cwd/ignore 由用户确认），
+  复杂多 group 场景仍需手工编辑
+- 自动探测为启发式，阈值（2 文件 / 1kB）用于避免极小样本误判；最终扩展名由用户确认并可追加
+
+### 10. 双后端与全局 `--backend` 选项
+
+**决策**: 将 develop 分支（内置 python-docx 自生成）与 feat/use-copyright-code-extractor 分支（子进程委托 copyright-code-extractor）两种后端统一为一个全局 CLI 选项 `--backend {builtin,external}`，默认 `builtin`。
+
+- `builtin`：进程内用 python-docx 生成，默认安装仅含 MIT/BSD 依赖（pathspec、typer-slim、python-docx），支持 `company` / `lineNumber` / `maxLines`，输出含标题页与页眉页脚。
+- `external`：复用既有子进程委托 copyright-code-extractor 的逻辑（GPL-3.0 聚合合规），输出风格为去注释、每页固定行数、页眉仅软件名 + 版本。
+
+**理由**:
+- develop 与 feat 分支本质是「后端生成策略」不同，统一为选项后一份工具同时支持两种输出风格与依赖策略，避免长期维护两份分支。
+- 默认 `builtin` 使默认安装保持 MIT/BSD 纯净：GPL 组件 copyright-code-extractor 作为可选依赖组 `external`（PEP 621 `[project.optional-dependencies]`）提供，仅 `uv tool install "pysample[external]"` 时才引入，默认 `uv tool install pysample` 不含任何 GPL 依赖。
+- `external` 后端下若 group 配置了 `company` / `lineNumber`，工具输出 warning 并忽略，保持字段语义清晰。
+- 仅全局 `--backend`（不按 group），保持实现简单；CLI 框架统一为 Typer + 标准库 logging，不引入 develop 分支的 click/loguru。
+
+**权衡**:
+- 内置 python-docx 生成与 external 输出风格不同（标题页、行号、注释剥离等），用户需按需求选择。
+- `external` 缺失依赖时，`_generate_external_doc()` 用 `importlib.util.find_spec` 预判并给出安装指引，避免晦涩异常。
+
+### 11. Docker 运行模式（容器化分发）
+
+**决策**: 新增 `Dockerfile`（多阶段构建，参考 `biggates/deplowly` 的 `Dockerfile` 模式），支持以容器方式分发与运行 pysample。
+
+- **builder 阶段**：`ghcr.io/astral-sh/uv:python3.12-trixie-slim`（自带 uv），设 `UV_COMPILE_BYTECODE=1` + `UV_LINK_MODE=copy`（copy 保证 venv 可被 COPY 到 runner）。先 `COPY pyproject.toml uv.lock` 后 `uv sync --frozen --no-install-project --no-dev` 缓存依赖层，再 `COPY . .` 并 `uv sync --frozen --no-dev [--extra external]` 安装项目（hatchling 打包 `main.py`，生成 console script `pysample`，decision 3 的包入口）。
+- **runner 阶段**：`python:3.12-slim-trixie`，`COPY --from=builder /app /app`，`PATH` 注入 `.venv/bin`，`ENTRYPOINT ["pysample"]`。builder/runner 同用 trixie 以保证 venv 二进制兼容。
+- `ARG VARIANT=builtin`（默认）参数化 optional 依赖组：builtin（`uv sync --no-dev`，仅 MIT/BSD）与
+  external（`uv sync --no-dev --extra external`，额外引入 GPL-3.0 的 copyright-code-extractor）共用单 Dockerfile，变体差异仅一行；
+  本地构建 `docker build .` 默认即 builtin，行为不变。
+- 需要 external 后端时，镜像构建阶段 `docker build . --build-arg VARIANT=external`，运行时再叠加 `--backend external`。
+- `uv sync --frozen` 强制使用已提交的 `uv.lock`，构建可复现（lock 与 pyproject 不一致则构建失败，倒逼提交 lock）。PyPI 镜像由 `pyproject.toml` 的 `tool.uv.index`（aliyun，default）自动生效，无需在 Dockerfile 写 `--index-url`。
+- 新增 `.dockerignore` 排除 `.git` / `.github` / `docs` / `*.md` / `.codebuddy`，避免无关文件进入构建上下文与镜像。
+
+**理由**:
+- 容器分发消除了不同主机 Python 版本与系统字体的差异（标题页 Microsoft YaHei 等输出依赖本地字体，固定基础镜像保证输出一致），契合软著文档「格式稳定」的诉求。
+- 项目已是 uv 生态（`pyproject.toml` + `uv.lock`，CI 用 uv），改用 uv 多阶段与现有一致，且依赖层缓存 + `--frozen` 可复现优于裸 `pip install`。
+- 默认 builtin 与全局 `--backend` 选项天然对齐，Docker 层无需额外分支或环境变量。
+- `ENTRYPOINT` 复用既有的 console script，Docker 仅作为**部署 seam（聚合）**，不重写入口契约。
+
+**权衡**:
+- 默认镜像不含 external；需 external 的用户必须自行构建带 `VARIANT=external` 的变体，否则运行 `--backend external`
+  会因缺失依赖而由 decision 10 的 `find_spec` 守卫报错（行为一致，但镜像内报错体验弱于本地）。
+- 容器与 `uvx` / `uv tool install` 是两条并列分发路径，需同步维护依赖变更（含 `uv.lock` 随 pyproject 提交）。
+- 基础镜像由 `python:3.13-slim` 改为 `python:3.12`（匹配 CI 与 `requires-python>=3.12`），且 builder/runner 统一 trixie；若后续需 3.13 须同步调整两边版本避免 venv 不兼容。
+
+### 12. 双变体 Docker CI 与发布 tag 体系
+
+**决策**: CI 拆分为两个作业（参考 `biggates/deplowly` 的 `ci.yml` 模式），文件为 `.github/workflows/ci.yml`，两个镜像变体推送到 `ghcr.io`（沿用既有 `GITHUB_TOKEN` 凭据）：
+
+- **`test` 作业（正常编译）**：在 `push`（develop / `v*` tag）、`pull_request`、`workflow_dispatch` 时运行 `ruff check .` + `python -m py_compile main.py`。pysample 为单文件工具、无 `src/`/`tests/`（decision 8 明确无测试），故不引入 `mypy`/`pytest` 以免误失败；仅做 lint 与语法编译校验。
+- **`image` 作业（发布版本）**：`needs: test` 门禁，且 `if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'` —— 即**仅推送 `v*` tag 时真正推送镜像**，`workflow_dispatch` 仅构建不推送（用于验证 Dockerfile）。
+  - 通过 `strategy.matrix.variant: [builtin, external]` 双变体并行构建，变体差异由 `build-args: PIP_EXTRA=...` 传入（decision 11 的 `ARG`）。
+  - 使用 `docker/metadata-action@v6` 生成 tag 体系：
+    - 标准版：`latest` + `v{version}` + `v{major}.{minor}` + `sha-<hash>`（如 `pysample:latest`、`pysample:v1.0.0`、`pysample:v1.0`）
+    - external 版：经 `flavor: prefix=external-` 统一加前缀 → `external-latest`、`external-v1.0.0`、`external-v1.0`、`external-sha-<hash>`
+  - `push: ${{ startsWith(github.ref, 'refs/tags/v') }}` —— 只有 tag 事件才真正推送，`workflow_dispatch`/非 tag 仅本地构建校验。
+- `IMAGE_NAME` 经 `${GITHUB_REPOSITORY,,}` 小写化（github.repository 含大写 `EaphoneTech`，ghcr.io 要求镜像名全小写），修复历史大写推送失败隐患。
+- 多平台 `linux/amd64,linux/arm64`（启用 `setup-qemu-action` 支持 arm 模拟）构建，并启用 `cache-from/to: type=gha` 复用 GitHub Actions 缓存。
+
+**理由**:
+- 发布版本才用 metadata-action 生成 `latest` + `v{version}`（semver 解析 `v*` tag），保证 `latest` 始终指向受控发布而非任意提交；正常编译（push/PR）仅跑 `test` 作业，不构建、不污染 `latest`。
+- `external-` 前缀将 GPL-3.0 聚合依赖的镜像与纯净 MIT/BSD 镜像在 tag 维度彻底分离，与 decision 2/10 的「默认纯净、external 可选」边界一致；用户 `docker run ghcr.io/eaphontech/pysample:external-latest --backend external` 明确知道自己拉取了含 GPL 的变体。
+- 双变体共用单 `Dockerfile`（`ARG PIP_EXTRA`）+ matrix 并行，避免复制维护成本（DRY），总耗时≈单变体。
+
+**权衡**:
+- `latest` 仅在 `v*` tag 发布时更新；日常 develop 推送只验证构建（不推送），如需在 develop 上验证最新镜像可用 `workflow_dispatch` 手动触发（但默认不推送，避免污染 `latest`）。
+- 正常编译路径不推送任何 tag，故无 sha 溯源镜像；溯源依赖 Release 的 `sha-<hash>` tag。
+
 ## 模块深度分析
 
 ### 深模块 (Deep Modules)
@@ -157,12 +246,12 @@ pysample 是一个生成软件著作权源代码文档的 CLI 工具。它读取
 
 | 触发器 | 建议动作 |
 |--------|---------|
-| 需要恢复自建 docx 生成 | 从 Git 历史恢复 python-docx 函数 |
-| 需要 PDF 输出 | 在 `.copyright-extractor.json` 中启用 `export_pdf` |
+| 需要 PDF 输出 | 在 `.copyright-extractor.json` 中启用 `export_pdf`（external 后端） |
 | 需要单元测试 | 将 `scan_files` 提取到独立模块，mock `subprocess.run` |
 | 代码超过 800 行 | 按职责拆分: `config.py` / `scanner.py` / `adaptor.py` / `cli.py` |
 | 需要自定义配置路径 | 添加 `--config` CLI 选项 |
-| Docker 运行模式完成 | 需更新 Dockerfile 以适配新的依赖关系 |
+| Docker 运行模式 | 已实现（decision 11）：`python:3.13-slim` + ENTRYPOINT `pysample`；默认 builtin，需 external 时构建带 `[external]` 的变体 |
+| 内置 python-docx 后端 | 已落地（decision 10），默认 `builtin` 即进程内生成，无需从历史恢复 |
 
 ## 术语对齐
 
@@ -174,3 +263,4 @@ pysample 是一个生成软件著作权源代码文档的 CLI 工具。它读取
 | 配置文件、CLI 参数 | 外部 **seam** |
 | copyright-code-extractor subprocess | 外部工具 / aggregate component |
 | 暂存目录 `.copyright-extractor.json` | 跨进程通信接口 |
+| `Dockerfile` + `ENTRYPOINT pysample` | 部署 seam（聚合）：镜像内复用 console script，不重写入口契约 |

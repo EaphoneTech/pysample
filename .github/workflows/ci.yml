@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [develop]
-    tags: ["release/*"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -28,11 +28,11 @@ jobs:
       - name: Compile
         run: uv run python -m py_compile main.py
 
-  # 发布版本：仅当推送 release/* tag（或手动 workflow_dispatch 仅构建不推送）时，
+  # 发布版本：仅当推送 v* tag（或手动 workflow_dispatch 仅构建不推送）时，
   # 经 test 门禁后构建并推送镜像，tag 由 docker/metadata-action 生成。
   image:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/release/') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,7 +76,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ startsWith(github.ref, 'refs/tags/release/') }}
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           build-args: |
             VARIANT=${{ matrix.variant == 'external' && 'external' || 'builtin' }}
           tags: ${{ steps.meta.outputs.tags }}

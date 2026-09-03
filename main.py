@@ -1,4 +1,5 @@
 import contextlib
+import importlib.util
 import itertools
 import json
 import logging
@@ -12,6 +13,11 @@ from typing import Any
 
 import pathspec
 import typer
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -210,8 +216,328 @@ def _write_extractor_config(
     return config_path
 
 
-def generate(verbose: bool) -> None:
-    """遍历配置中的 group，扫描源码并委托 copyright-code-extractor 生成 DOCX。"""
+def remove_consecutive_blank_lines(text: str) -> str:
+    """去除空行并将制表符替换为空格。"""
+    lines = text.splitlines()
+    cleaned_lines = [
+        line.replace("\t", "    ") for line in lines if len(line.strip()) > 0
+    ]
+    return "\n".join(cleaned_lines)
+
+
+def set_font(doc: Document) -> None:
+    """设置全局字体为 Microsoft YaHei。"""
+    style = doc.styles["Normal"]
+    font = style.font
+    font.name = "Microsoft YaHei"
+    rFonts = font.element.rPr.rFonts
+    rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+
+
+def add_title_page(doc: Document, title: str, version: str, company: str) -> None:
+    # 计算剩余空间并将公司信息放置在接近底部的位置
+    section = doc.sections[0]
+    page_height = (
+        section.page_height.cm
+        - section.top_margin.cm
+        - section.bottom_margin.cm
+        - 0.4  # section.header
+        - 0.4  # section.footer
+    )
+    current_height = (
+        2.5  # 假设标题行高约为2.5cm
+        + 0.5  # 假设版本行高约为0.5cm
+        + 0.5  # 假设“源代码”行高约为0.5cm
+        + 8  # 手动再调整一下
+    )  # 假设段间距为1.5cm
+
+    remaining_space = (page_height - current_height) / 2
+
+    # 添加空白段落以填充剩余空间
+    blank_paragraph = doc.add_paragraph("")
+    blank_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    blank_paragraph.paragraph_format.space_after = Pt(
+        remaining_space * 28.35
+    )  # cm to pt conversion
+
+    # 创建标题页
+    title_paragraph = doc.add_paragraph(title)
+    title_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    title_run = title_paragraph.runs[0]
+    title_run.bold = True
+    title_run.font.size = Pt(26)  # 一号字体大小约为26pt
+
+    # 添加版本信息
+    version_paragraph = doc.add_paragraph(version)
+    version_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    version_run = version_paragraph.runs[0]
+    version_run.font.size = Pt(14)
+
+    # 添加“源代码”字样
+    source_code_paragraph = doc.add_paragraph("源代码")
+    source_code_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    source_code_run = source_code_paragraph.runs[0]
+    source_code_run.font.size = Pt(14)
+
+    # 添加空白段落以填充剩余空间
+    blank_paragraph = doc.add_paragraph("")
+    blank_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    blank_paragraph.paragraph_format.space_after = Pt(
+        remaining_space * 28.35
+    )  # cm to pt conversion
+
+    # 添加公司信息
+    company_paragraph = doc.add_paragraph(company)
+    company_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    company_run = company_paragraph.runs[0]
+    company_run.font.size = Pt(14)
+
+    # 添加分页符
+    doc.add_page_break()
+
+
+def add_header_footer(doc: Document, title: str, version: str) -> None:
+    # 设置页边距为最窄
+    section = doc.sections[0]
+    section.top_margin = Cm(0.5)
+    section.bottom_margin = Cm(0.5)
+    section.left_margin = Cm(0.6)
+    section.right_margin = Cm(0.6)
+    section.header_distance = Cm(0.1)
+    section.footer_distance = Cm(0.1)
+
+    # 设置页眉高度
+    header = section.header
+    header.height = Cm(0.2)
+    header_paragraph = header.paragraphs[0]
+    header_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    header_paragraph.paragraph_format.space_before = Pt(0)
+    header_paragraph.paragraph_format.space_after = Pt(0)
+
+    # 添加页眉内容
+    header_run = header_paragraph.add_run(f"{title} {version}\t\t\t")
+    header_run.font.size = Pt(10)
+
+    # 添加当前页码到页眉右侧
+    run = header_paragraph.add_run()
+    fldSimple = OxmlElement("w:fldSimple")
+    fldSimple.set(qn("w:instr"), " PAGE ")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+    fldSimple.append(r)
+    run._r.append(fldSimple)
+
+    # 添加斜杠到页眉右侧
+    run = header_paragraph.add_run("/")
+    run.font.size = Pt(10)
+
+    # 添加总页码到页眉右侧
+    run = header_paragraph.add_run()
+    fldSimple = OxmlElement("w:fldSimple")
+    fldSimple.set(qn("w:instr"), " NUMPAGES ")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+    fldSimple.append(r)
+    run._r.append(fldSimple)
+
+    # 设置页脚高度
+    footer = section.footer
+    footer.height = Cm(0.2)
+    footer_paragraph = footer.paragraphs[0]
+    footer_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    footer_paragraph.paragraph_format.space_before = Pt(0)
+    footer_paragraph.paragraph_format.space_after = Pt(0)
+
+    # 添加页脚内容
+    footer_run = footer_paragraph.add_run(f"{title} {version}\t\t\t")
+    footer_run.font.size = Pt(10)
+
+    # 添加当前页码到页脚右侧
+    run = footer_paragraph.add_run()
+    fldSimple = OxmlElement("w:fldSimple")
+    fldSimple.set(qn("w:instr"), " PAGE ")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+    fldSimple.append(r)
+    run._r.append(fldSimple)
+
+    # 添加斜杠到页脚右侧
+    run = footer_paragraph.add_run("/")
+    run.font.size = Pt(10)
+
+    # 添加总页码到页脚右侧
+    run = footer_paragraph.add_run()
+    fldSimple = OxmlElement("w:fldSimple")
+    fldSimple.set(qn("w:instr"), " NUMPAGES ")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+    fldSimple.append(r)
+    run._r.append(fldSimple)
+
+    # 添加制表符并设置其位置
+    tab_stops = header_paragraph.paragraph_format.tab_stops
+    tab_stops.add_tab_stop(Cm(20), WD_TAB_ALIGNMENT.RIGHT)
+    tab_stops = footer_paragraph.paragraph_format.tab_stops
+    tab_stops.add_tab_stop(Cm(20), WD_TAB_ALIGNMENT.RIGHT)
+
+
+def add_main_content(
+    doc: Document,
+    files: list[Path],
+    include_line_numbers: bool,
+    max_lines: int = 2000,
+) -> None:
+    total_lines = 0  # 初始化总行数计数器
+
+    for file_index, file_path in enumerate(files):
+        if total_lines > max_lines:
+            logger.info("已达到行数限制 %d", max_lines)
+            break
+
+        full_path = Path(file_path)
+        try:
+            with open(full_path, encoding="utf-8") as file:
+                content = file.read()
+                content = remove_consecutive_blank_lines(content)
+                lines = content.splitlines()
+
+                if include_line_numbers:
+                    numbered_lines = [
+                        f"{line_no}: {line}"
+                        for line_no, line in enumerate(lines, start=total_lines)
+                    ]
+                    content = "\n".join(numbered_lines)
+
+                doc.add_paragraph(content)
+                total_lines += len(lines)  # 更新总行数计数器
+                logger.debug("加入第 %d 个文件 %s", file_index + 1, full_path)
+
+        except Exception as e:
+            logger.error("无法读取文件 %s: %s", full_path, e)
+
+
+def add_content_to_docx(
+    doc: Document,
+    title: str,
+    version: str,
+    company: str,
+    files: list[Path],
+    include_line_numbers: bool,
+    max_lines: int,
+) -> None:
+    # 设置全局字体
+    set_font(doc)
+
+    # 添加页眉和页脚
+    add_header_footer(doc, title, version)
+
+    # 添加标题页
+    add_title_page(doc, title, version, company)
+
+    # 添加正文内容
+    add_main_content(doc, files, include_line_numbers, max_lines=max_lines)
+
+
+def _generate_builtin_doc(
+    group: dict[str, Any],
+    matched_files: list[Path],
+    base_path: Path,
+    output_file: Path,
+) -> None:
+    """使用内置 python-docx 在进程内生成 DOCX（纯 MIT/BSD，无 GPL 依赖）。"""
+    title = group.get("title", "未命名文档")
+    version = group.get("version", "1.0")
+    company = group.get("company", "未知公司")
+    include_line_numbers = group.get("lineNumber", False)
+    max_lines = group.get("maxLines", 2000)
+
+    # 将扫描得到的相对路径解析为基于 cwd 的绝对路径后读取
+    resolved_files = [
+        (base_path / f).resolve() if not Path(f).is_absolute() else Path(f).resolve()
+        for f in matched_files
+    ]
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    doc = Document()
+    add_content_to_docx(
+        doc,
+        title,
+        version,
+        company,
+        resolved_files,
+        include_line_numbers,
+        max_lines=max_lines,
+    )
+    doc.save(output_file)
+    logger.info("DOCX 文件已生成: %s", output_file)
+
+
+def _generate_external_doc(
+    matched_files: list[Path],
+    base_path: Path,
+    output_file: Path,
+    group: dict[str, Any],
+) -> None:
+    """通过子进程委托 copyright-code-extractor (GPL-3.0) 生成 DOCX。"""
+    if importlib.util.find_spec("copyright_code_extractor") is None:
+        raise RuntimeError(
+            "external 后端依赖 copyright-code-extractor 未安装。\n"
+            '请通过 `uv tool install "pysample[external]"` 安装后再使用 --backend external。'
+        )
+
+    # 暂存命中文件到临时目录（保留目录结构），以便 copyright-code-extractor
+    # 能通过目录扫描方式处理（该工具不支持传入文件列表）
+    temp_dir = _prepare_temp_directory(matched_files, base_path)
+
+    try:
+        # 生成 copyright-code-extractor 配置文件
+        config_file = _write_extractor_config(temp_dir, output_file, group)
+
+        # 通过子进程委托给 copyright-code-extractor（GPL-3.0）。
+        # 使用 sys.executable -m 确保在任何 uvx / uv tool / pip 等
+        # 安装方式下都能找到正确的解释器环境中的包。
+        cmd = [
+            sys.executable,
+            "-m",
+            "copyright_code_extractor.cli",
+            str(temp_dir),
+            "-c",
+            str(config_file),
+        ]
+        logger.info("正在调用 copyright-code-extractor...")
+        logger.debug("命令: %s", " ".join(cmd))
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            logger.error(
+                "copyright-code-extractor 执行失败 (exit code %d):\n%s",
+                result.returncode,
+                result.stderr,
+            )
+            raise RuntimeError(f"copyright-code-extractor failed: {result.stderr}")
+
+        if result.stdout:
+            logger.info("%s", result.stdout.strip())
+
+        logger.info("DOCX 文件已生成: %s", output_file)
+
+    finally:
+        # 清理临时目录
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        logger.debug("已清理临时目录: %s", temp_dir)
+
+
+def generate(verbose: bool, backend: str) -> None:
+    """遍历配置中的 group，扫描源码并按所选后端生成 DOCX。"""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.info("详细日志已启用")
@@ -251,47 +577,16 @@ def generate(verbose: bool) -> None:
 
         base_path = Path(base_dir).resolve()
 
-        # 暂存命中文件到临时目录（保留目录结构），以便 copyright-code-extractor
-        # 能通过目录扫描方式处理（该工具不支持传入文件列表）
-        temp_dir = _prepare_temp_directory(matched_files, base_path)
-
-        try:
-            # 生成 copyright-code-extractor 配置文件
-            config_file = _write_extractor_config(temp_dir, output_file, group)
-
-            # 通过子进程委托给 copyright-code-extractor（GPL-3.0）。
-            # 使用 sys.executable -m 确保在任何 uvx / uv tool / pip 等
-            # 安装方式下都能找到正确的解释器环境中的包。
-            cmd = [
-                sys.executable,
-                "-m",
-                "copyright_code_extractor.cli",
-                str(temp_dir),
-                "-c",
-                str(config_file),
-            ]
-            logger.info("正在调用 copyright-code-extractor...")
-            logger.debug("命令: %s", " ".join(cmd))
-
-            result = subprocess.run(cmd, capture_output=True, text=True)
-
-            if result.returncode != 0:
-                logger.error(
-                    "copyright-code-extractor 执行失败 (exit code %d):\n%s",
-                    result.returncode,
-                    result.stderr,
+        if backend == "builtin":
+            _generate_builtin_doc(group, matched_files, base_path, output_file)
+        elif backend == "external":
+            if group.get("company") or group.get("lineNumber"):
+                logger.warning(
+                    "%s: external 后端不支持 company/lineNumber，相关配置已忽略", title
                 )
-                raise RuntimeError(f"copyright-code-extractor failed: {result.stderr}")
-
-            if result.stdout:
-                logger.info("%s", result.stdout.strip())
-
-            logger.info("DOCX 文件已生成: %s", output_file)
-
-        finally:
-            # 清理临时目录
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            logger.debug("已清理临时目录: %s", temp_dir)
+            _generate_external_doc(matched_files, base_path, output_file, group)
+        else:
+            raise ValueError(f"未知后端: {backend}，可选 builtin / external")
 
 
 def detect_languages(base_dir: str = ".") -> tuple[list[str], list[str]]:
@@ -403,6 +698,11 @@ def run_init() -> None:
 def main(
     ctx: typer.Context,
     verbose: bool = typer.Option(False, "--verbose", help="启用详细日志输出"),
+    backend: str = typer.Option(
+        "builtin",
+        "--backend",
+        help="文档生成后端: builtin(内置 python-docx, 默认, 纯 MIT) 或 external(委托 copyright-code-extractor, GPL-3.0)",
+    ),
 ) -> None:
     """生成软件著作权源代码文档（bring-it/sample 兼容）。
 
@@ -411,6 +711,10 @@ def main(
     # 有子命令（如 init）时交给子命令自行处理，避免重复执行文档生成
     if ctx.invoked_subcommand is not None:
         return
+
+    if backend not in ("builtin", "external"):
+        logger.error("未知后端: %s，可选 builtin / external", backend)
+        raise typer.Exit(code=1)
 
     if not CONFIG_PATH.exists():
         if typer.confirm(
@@ -424,7 +728,7 @@ def main(
             )
             raise typer.Exit(code=1)
 
-    generate(verbose)
+    generate(verbose, backend)
 
 
 @app.command()

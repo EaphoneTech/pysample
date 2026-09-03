@@ -1,6 +1,7 @@
 # 第三方许可声明 (Third-Party Licenses)
 
-本项目 (pysample, MIT License) 使用以下第三方组件：
+本项目 (pysample, MIT License) 默认仅依赖 MIT/BSD 组件（pathspec、typer-slim、python-docx）。
+以下 GPL 组件仅在选用 `external` 后端（需安装 `external` 可选依赖组）时才被引入：
 
 ---
 
@@ -23,7 +24,7 @@ pysample 通过 **子进程调用 (subprocess)** 方式使用 copyright-code-ext
 1. pysample **不 import / 不链接** copyright-code-extractor 的任何模块，不与之运行于
    同一进程地址空间；
 2. pysample 不复制、不修改、不分发 copyright-code-extractor 的源代码或二进制文件；
-3. copyright-code-extractor 由用户通过 PyPI（uv/pip）单独安装，作为运行时环境中的独立工具存在；
+3. copyright-code-extractor 作为 pysample 的**可选依赖组 `external`** 提供；默认安装（`uv tool install pysample`）不包含它，仅当用户显式安装 `pysample[external]` 时才通过 PyPI（uv/pip）引入，作为运行时环境中的独立工具存在；
 4. 二者之间的通信仅限于命令行参数和文件系统，不构成 GPL 意义上的「intimate data communication
    or control flow between subprograms」。
 

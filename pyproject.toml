@@ -6,11 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pathspec>=1.1",
-    "copyright-code-extractor>=0.2.1",
     "typer-slim>=0.24.0",
+    "python-docx>=1.2",
 ]
+
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
-license = "MIT"
+license = {text = "MIT"}
 license-files = ["licenses/*"]
 
 [build-system]
@@ -25,6 +26,12 @@ pysample = "main:app"
 
 [project.urls]
 Homepage = "https://github.com/EaphoneTech/pysample"
+
+[project.optional-dependencies]
+# external 后端（委托 GPL-3.0 的 copyright-code-extractor）作为可选依赖。
+# 默认 `uv tool install pysample` 仅含 MIT/BSD 依赖（保持许可证纯净）；
+# 仅在需要使用 `--backend external` 时通过 `uv tool install "pysample[external]"` 安装。
+external = ["copyright-code-extractor>=0.2.1"]
 
 [[tool.uv.index]]
 name = "aliyun"

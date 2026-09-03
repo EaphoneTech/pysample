@@ -8,8 +8,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# 再复制源码并安装项目本身（hatchling 打包 main.py，生成 console script pysample）。
-COPY . .
+# 项目文件量少，逐个显式 COPY（不依赖 .dockerignore 决定进入镜像的内容）。
+# hatchling 打包 main.py 需要 README.md（readme 字段）与 LICENSE/licenses/*（license-files）；
+# LICENSE/THIRD-PARTY-LICENSES.md 一并带入镜像作为许可证文档。
+COPY main.py README.md LICENSE THIRD-PARTY-LICENSES.md ./
+COPY licenses/ ./licenses/
 # VARIANT 控制 optional 依赖组：
 #   builtin（默认）-> 仅 MIT/BSD 依赖（pathspec / typer-slim / python-docx），许可证纯净
 #   external       -> 额外引入 GPL-3.0 聚合依赖 copyright-code-extractor

@@ -396,7 +396,7 @@ source = { editable = "." }
 dependencies = [
     { name = "copyright-code-extractor" },
     { name = "pathspec" },
-    { name = "typer" },
+    { name = "typer-slim" },
 ]
 
 [package.dev-dependencies]
@@ -408,7 +408,7 @@ dev = [
 requires-dist = [
     { name = "copyright-code-extractor", specifier = ">=0.2.1" },
     { name = "pathspec", specifier = ">=1.1" },
-    { name = "typer", specifier = ">=0.16" },
+    { name = "typer-slim", specifier = ">=0.24.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -487,6 +487,18 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/7c/f7/68adc395201b20b872d68e975386832e8005ffeacedd43a1d837a32815be/typer-0.26.8.tar.gz", hash = "sha256:c244a6bd558886fe3f8780efb6bdd28bb9aff005a94eedebaa5cb32926fe2f7e" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/80/87/b9fd69c92c6102a066e1b86a35243f53e70bd4c709f2a26d9f4fee4f4dc0/typer-0.26.8-py3-none-any.whl", hash = "sha256:3512ca79ac5c11113414b36e80281b872884477722440691c89d1112e321a49c" },
+]
+
+[[package]]
+name = "typer-slim"
+version = "0.24.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "typer" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/a7/a7/e6aecc4b4eb59598829a3b5076a93aff291b4fdaa2ded25efc4e1f4d219c/typer_slim-0.24.0.tar.gz", hash = "sha256:f0ed36127183f52ae6ced2ecb2521789995992c521a46083bfcdbb652d22ad34" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/a7/24/5480c20380dfd18cf33d14784096dca45a24eae6102e91d49a718d3b6855/typer_slim-0.24.0-py3-none-any.whl", hash = "sha256:d5d7ee1ee2834d5020c7c616ed5e0d0f29b9a4b1dd283bdebae198ec09778d0e" },
 ]
 
 [[package]]

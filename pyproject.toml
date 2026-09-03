@@ -6,8 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pathspec>=1.1",
-    "typer>=0.16",
     "copyright-code-extractor>=0.2.1",
+    "typer-slim>=0.24.0",
 ]
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
 license = "MIT"

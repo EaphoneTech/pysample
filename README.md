@@ -51,6 +51,25 @@ pysample 不受 GPL 传染性条款约束，继续以 MIT License 分发。
 > - `company` — 不再出现在输出文档中（copyright-code-extractor 页眉仅含软件名与版本）
 > - `prologue` / `epilogue` — 保持忽略
 
+## 快速初始化 (init)
+
+如果不想手工编写 `.bring-it/sample.config.json`，可以用 `init` 命令交互式生成：
+
+```bash
+$ pysample init
+```
+
+`init` 会：
+
+1. 自动探测项目中的常见源码格式（某语言文件数 ≥ 2 或 总字节 ≥ 1kB 即视为检测到），预填 `extensions`；
+2. 依次询问软件名称 (title)、版本 (version)、是否采用自动探测的扩展名、额外扩展名、基准目录 (cwd) 与忽略目录 (ignore)；
+3. 写出 `.bring-it/sample.config.json`（单个 group，`patterns` 默认为 `["**"]`）。
+
+此外，直接运行 `pysample`（不带子命令）且未发现配置文件时，会交互式提示是否初始化（默认 Y）；
+若已存在配置文件则直接开始生成文档。`pysample init` 在配置已存在时会提示是否重新初始化（默认 N）。
+
+> 注：本项目依赖已从 `typer` 迁移为 `typer-slim`（仅改依赖名，代码仍 `import typer`，运行行为不变）。
+
 ## 输出
 
 对于配置文件中的每一个 group, 会在 `.bring-it/sample/` 目录下生成 `{title}_{version}.docx`。

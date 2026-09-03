@@ -693,6 +693,12 @@ def run_init() -> None:
 
     logger.info("已生成配置文件: %s", CONFIG_PATH.resolve())
 
+    # 生成 .bring-it/.gitignore，忽略生成的 sample 产物目录
+    gitignore_path = CONFIG_PATH.parent / ".gitignore"
+    with open(gitignore_path, "w", encoding="utf-8") as f:
+        f.write("sample\n")
+    logger.info("已生成忽略文件: %s", gitignore_path.resolve())
+
 
 @app.callback(invoke_without_command=True)
 def main(

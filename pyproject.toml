@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 authors = [{name = "Xiaoyu Guo", email = "biggates2010@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
 license-files = ["licenses/*"]
 
 [build-system]
@@ -33,11 +33,6 @@ Homepage = "https://github.com/EaphoneTech/pysample"
 # 仅在需要使用 `--backend external` 时通过 `uv tool install "pysample[external]"` 安装。
 external = ["copyright-code-extractor>=0.2.1"]
 
-[[tool.uv.index]]
-name = "aliyun"
-url = "https://mirrors.aliyun.com/pypi/simple/"
-default = true
-
 [tool.ruff.lint]
 ignore = ["F821", "E501", "RUF001", "RUF002", "RUF003"]
 select = [
@@ -53,5 +48,5 @@ select = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.21",
+    "ruff>=0.16",
 ]

@@ -59,19 +59,36 @@ jobs:
       # ghcr.io 要求镜像名全小写（github.repository 含大写 EaphoneTech）。
       - name: Lowercase image name
         run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-      - name: Extract metadata
-        id: meta
+      # builtin / external 的 tag 规则互不相同，拆成两个 metadata 步骤按 variant 二选一执行，
+      # 每个变体的 tags 全集一目了然，无需用 flavor.prefix + prefix= 覆盖去绕 auto-latest。
+      - name: Extract metadata (builtin)
+        id: meta-builtin
+        if: matrix.variant == 'builtin'
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest=false：latest 由下方 type=raw 显式生成，不依赖 auto-latest。
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=latest,prefix=
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+      - name: Extract metadata (external)
+        id: meta-external
+        if: matrix.variant == 'external'
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: |
-            prefix=${{ matrix.variant == 'external' && 'external-' || '' }}
+            latest=false
+            prefix=external-
           tags: |
-            # latest 标签显式按变体命名，并用 prefix= 覆盖全局前缀，
-            # 避免 external 变体误推裸 latest（与 builtin 的 latest 冲突）。
-            type=raw,value=${{ matrix.variant == 'external' && 'external-latest' || 'latest' }},prefix=
+            # latest 由 raw 显式生成（prefix= 覆盖 flavor 的 external-），
+            # 避免生成裸 latest 覆盖 builtin 的 latest。
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
+            type=raw,value=external-latest,prefix=
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -80,7 +97,7 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           build-args: |
             VARIANT=${{ matrix.variant == 'external' && 'external' || 'builtin' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-builtin.outputs.tags || steps.meta-external.outputs.tags }}
+          labels: ${{ steps.meta-builtin.outputs.labels || steps.meta-external.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
